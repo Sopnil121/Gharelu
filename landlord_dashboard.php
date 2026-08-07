@@ -493,7 +493,7 @@ mysqli_close($conn);
 
 <!-- SIDEBAR: branding, logged-in user info, and tab navigation -->
 <aside class="sidebar">
-<aside class="sidebar">
+
   <div class="logo"><span>🏠Gharelu</span></div>
   <!-- Avatar + name now doubles as the Profile link -->
   <a class="user-info" href="profile.php" title="View Profile">
