@@ -94,8 +94,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         <div class="top-section">
 
-            <div class="icon">🏠</div>
-
             <h1>Welcome Back</h1>
 
             <p>Login to your Gharelu account</p>
