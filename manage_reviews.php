@@ -90,6 +90,11 @@ mysqli_close($conn);
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link" href="contact_replies/contact_messages.php">
+                        <i class="fas fa-envelope me-1"></i>Messages
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="logout.php">
                         <i class="fas fa-sign-out-alt me-1"></i>Logout
                     </a>

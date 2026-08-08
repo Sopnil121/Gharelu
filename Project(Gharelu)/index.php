@@ -867,6 +867,56 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'home';
                 </div>
             </div>
         </div>
+
+        <!-- Community Q&A Section -->
+        <?php
+        require_once 'config.php';
+        $conn = getDBConnection();
+        $qa_sql = "SELECT name, subject, message, admin_reply, status, created_at, replied_at FROM contact_messages ORDER BY created_at DESC";
+        $qa_result = $conn->query($qa_sql);
+        ?>
+        <div class="contact-qa-section">
+            <h3>Community Q&A</h3>
+            <?php if ($qa_result && $qa_result->num_rows > 0): ?>
+                <div class="qa-list">
+                    <?php while ($qa_row = $qa_result->fetch_assoc()): ?>
+                        <div class="qa-card">
+                            <div class="qa-header">
+                                <span class="qa-user"><i class="fas fa-user-circle"></i> <?php echo htmlspecialchars($qa_row['name']); ?></span>
+                                <span class="qa-date"><i class="far fa-calendar-alt"></i> <?php echo date('M d, Y h:i A', strtotime($qa_row['created_at'])); ?></span>
+                            </div>
+                            <div class="qa-subject"><?php echo htmlspecialchars($qa_row['subject']); ?></div>
+                            <div class="qa-question"><?php echo nl2br(htmlspecialchars($qa_row['message'])); ?></div>
+                            
+                            <?php if (!empty($qa_row['admin_reply'])): ?>
+                                <div class="qa-answer">
+                                    <div class="qa-answer-header">
+                                        <i class="fas fa-user-shield"></i>
+                                        <span>Gharelu Admin Response</span>
+                                        <?php if ($qa_row['replied_at']): ?>
+                                            <span class="qa-date ms-auto" style="font-weight: normal; font-size: 0.75rem;"><i class="far fa-clock"></i> <?php echo date('M d, Y h:i A', strtotime($qa_row['replied_at'])); ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="qa-answer-text"><?php echo nl2br(htmlspecialchars($qa_row['admin_reply'])); ?></div>
+                                </div>
+                            <?php else: ?>
+                                <div class="qa-no-reply">
+                                    <i class="fas fa-hourglass-half"></i> Pending admin response...
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endwhile; ?>
+                </div>
+            <?php else: ?>
+                <p style="text-align: center; color: var(--text-light); font-style: italic; margin-top: 2rem;">No questions have been asked yet. Be the first to ask!</p>
+            <?php endif; ?>
+        </div>
+        <?php
+        if ($qa_result) {
+            $qa_result->free();
+        }
+        $conn->close();
+        ?>
     </div>
     <?php 
     // Clear session data after displaying

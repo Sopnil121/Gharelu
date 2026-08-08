@@ -1339,3 +1339,130 @@ body {
     align-items: center;
     margin-bottom: 2rem;
 }
+
+/* Community Q&A Section Styling */
+.contact-qa-section {
+    margin-top: 5rem;
+    padding-top: 3rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.contact-qa-section h3 {
+    font-size: 2.2rem;
+    text-align: center;
+    margin-bottom: 2.5rem;
+    color: var(--text-dark);
+    font-weight: 700;
+}
+
+.qa-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.qa-card {
+    background: var(--white);
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: var(--shadow-md);
+    border-left: 5px solid var(--primary-color);
+    transition: var(--transition);
+}
+
+.qa-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.qa-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #f0f4f8;
+    padding-bottom: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.qa-user {
+    font-weight: 600;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+}
+
+.qa-user i {
+    color: var(--primary-color);
+    font-size: 1.2rem;
+}
+
+.qa-date {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.qa-subject {
+    font-weight: 700;
+    font-size: 1.2rem;
+    margin-bottom: 0.75rem;
+    color: var(--primary-color);
+}
+
+.qa-question {
+    color: var(--text-dark);
+    margin-bottom: 1.5rem;
+    white-space: pre-wrap;
+    line-height: 1.6;
+    font-size: 1.05rem;
+}
+
+.qa-answer {
+    background: #f8fafc;
+    padding: 1.5rem;
+    border-radius: 12px;
+    border-left: 4px solid #38a169;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.qa-answer-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    color: #276749;
+    font-size: 0.95rem;
+    margin-bottom: 0.75rem;
+}
+
+.qa-answer-header i {
+    font-size: 1.1rem;
+}
+
+.qa-answer-text {
+    color: #2d3748;
+    white-space: pre-wrap;
+    line-height: 1.6;
+    font-size: 1rem;
+}
+
+.qa-no-reply {
+    font-size: 0.9rem;
+    color: #c05621;
+    font-style: italic;
+    background: #fffaf0;
+    border-left: 4px solid #dd6b20;
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
