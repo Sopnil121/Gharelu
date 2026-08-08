@@ -775,62 +775,107 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'home';
                 </div>
 
             <?php elseif ($section === 'contact'): ?>
-                <!-- Contact Section - WORKING HOURS REMOVED -->
-                <div class="contact-section">
-                    <h2>Contact Us</h2>
-                    <p>Have questions? We're here to help you find your perfect home.</p>
-                    <div class="contact-grid">
-                        <div class="contact-form-container">
-                            <form class="contact-form" action="contact.php" method="POST">
-                                <div class="form-group">
-                                    <label for="contact_name">Full Name</label>
-                                    <input type="text" id="contact_name" name="name" required placeholder="Enter your full name">
-                                </div>
-                                <div class="form-group">
-                                    <label for="contact_email">Email Address</label>
-                                    <input type="email" id="contact_email" name="email" required placeholder="Enter your email address">
-                                </div>
-                                <div class="form-group">
-                                    <label for="contact_subject">Subject</label>
-                                    <input type="text" id="contact_subject" name="subject" required placeholder="What is this about?">
-                                </div>
-                                <div class="form-group">
-                                    <label for="contact_message">Message</label>
-                                    <textarea id="contact_message" name="message" rows="5" required placeholder="Tell us how we can help you..."></textarea>
-                                </div>
-                                <button type="submit" class="btn-primary contact-submit">
-                                    <i class="fas fa-paper-plane"></i> Send Message
-                                </button>
-                            </form>
-                        </div>
-                        <div class="contact-info">
-                            <div class="contact-detail">
-                                <i class="fas fa-map-marker-alt"></i>
-                                <div>
-                                    <h4>Address</h4>
-                                    <p>Kathmandu, Nepal</p>
-                                </div>
-                            </div>
-                            <div class="contact-detail">
-                                <i class="fas fa-phone-alt"></i>
-                                <div>
-                                    <h4>Phone</h4>
-                                    <p>+977-1-555-1234</p>
-                                </div>
-                            </div>
-                            <div class="contact-detail">
-                                <i class="fas fa-envelope"></i>
-                                <div>
-                                    <h4>Email</h4>
-                                    <p>info@gharelu.com</p>
-                                </div>
-                            </div>
-                        </div>
+    <!-- Contact Section -->
+    <div class="contact-section">
+        <h2>Contact Us</h2>
+        <p>Have questions? We're here to help you find your perfect home.</p>
+        
+        <!-- Display success/error messages -->
+        <?php
+        session_start();
+        if (isset($_SESSION['contact_success'])): ?>
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i>
+                <?php 
+                echo $_SESSION['contact_success'];
+                unset($_SESSION['contact_success']);
+                ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['contact_errors']) && !empty($_SESSION['contact_errors'])): ?>
+            <div class="alert alert-error">
+                <i class="fas fa-exclamation-circle"></i>
+                <ul>
+                    <?php foreach ($_SESSION['contact_errors'] as $error): ?>
+                        <li><?php echo htmlspecialchars($error); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+            <?php unset($_SESSION['contact_errors']); ?>
+        <?php endif; ?>
+        
+        <div class="contact-grid">
+            <div class="contact-form-container">
+                <form class="contact-form" action="contact.php" method="POST">
+                    <div class="form-group">
+                        <label for="contact_name">Full Name <span class="required">*</span></label>
+                        <input type="text" id="contact_name" name="name" required 
+                               placeholder="Enter your full name"
+                               value="<?php echo isset($_SESSION['contact_data']['name']) ? htmlspecialchars($_SESSION['contact_data']['name']) : ''; ?>">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact_email">Email Address <span class="required">*</span></label>
+                        <input type="email" id="contact_email" name="email" required 
+                               placeholder="Enter your email address"
+                               value="<?php echo isset($_SESSION['contact_data']['email']) ? htmlspecialchars($_SESSION['contact_data']['email']) : ''; ?>">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact_subject">Subject <span class="required">*</span></label>
+                        <input type="text" id="contact_subject" name="subject" required 
+                               placeholder="What is this about?"
+                               value="<?php echo isset($_SESSION['contact_data']['subject']) ? htmlspecialchars($_SESSION['contact_data']['subject']) : ''; ?>">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact_message">Message <span class="required">*</span></label>
+                        <textarea id="contact_message" name="message" rows="5" required 
+                                  placeholder="Tell us how we can help you..."><?php echo isset($_SESSION['contact_data']['message']) ? htmlspecialchars($_SESSION['contact_data']['message']) : ''; ?></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary contact-submit">
+                        <i class="fas fa-paper-plane"></i> Send Message
+                    </button>
+                </form>
+            </div>
+            <div class="contact-info">
+                <div class="contact-detail">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <div>
+                        <h4>Address</h4>
+                        <p>Kathmandu, Nepal</p>
                     </div>
                 </div>
-            <?php endif; ?>
+                <div class="contact-detail">
+                    <i class="fas fa-phone-alt"></i>
+                    <div>
+                        <h4>Phone</h4>
+                        <p>+977-1-555-1234</p>
+                    </div>
+                </div>
+                <div class="contact-detail">
+                    <i class="fas fa-envelope"></i>
+                    <div>
+                        <h4>Email</h4>
+                        <p>info@gharelu.com</p>
+                    </div>
+                </div>
+                <!-- Response Time Information -->
+                <div class="contact-detail response-time">
+                    <i class="fas fa-clock"></i>
+                    <div>
+                        <h4>Response Time</h4>
+                        <p>We typically respond within 24 hours</p>
+                    </div>
+                </div>
+            </div>
         </div>
-    </section>
+    </div>
+    <?php 
+    // Clear session data after displaying
+    if (isset($_SESSION['contact_data'])) {
+        unset($_SESSION['contact_data']);
+    }
+    ?>
+<?php endif; ?>
 
     <!-- Property Modal -->
     <?php if ($selected_property): ?>
