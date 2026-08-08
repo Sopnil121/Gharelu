@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $description = trim($_POST['description'] ?? '');
 
         if ($houseId > 0 && $title !== '' && $city !== '' && $address !== '' && $price > 0) {
-            $stmt = mysqli_prepare($conn, 'UPDATE house SET title = ?, city = ?, address = ?, house_type = ?, price = ?, bedrooms = ?, bathrooms = ?, availability_status = ?, amenities = ?, description = ? WHERE house_id = ?');
+            $stmt = mysqli_prepare($conn, 'UPDATE house SET title = ?, city = ?, address = ?, house_type = ?, price = ?, bedrooms = ?, bathrooms = ?, availability_status = ?, furnishing = ?, description = ? WHERE house_id = ?');
             if ($stmt) {
                 mysqli_stmt_bind_param($stmt, 'ssssdiisssi', $title, $city, $address, $houseType, $price, $bedrooms, $bathrooms, $status, $amenities, $description, $houseId);
                 if (mysqli_stmt_execute($stmt)) {
@@ -71,9 +71,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Fetch all houses with landlord names
+// Fetch all houses with landlord names and images
 $query = "
-    SELECT h.*, u.full_name AS landlord_name 
+    SELECT h.*, u.full_name AS landlord_name, h.furnishing AS amenities,
+           (SELECT GROUP_CONCAT(image_url ORDER BY image_id ASC SEPARATOR '||') FROM house_image WHERE house_id = h.house_id) AS all_images
     FROM house h
     LEFT JOIN users u ON h.landlord_id = u.id
     ORDER BY h.house_id DESC
@@ -175,6 +176,7 @@ mysqli_close($conn);
                     <thead class="table-dark">
                         <tr>
                             <th>ID</th>
+                            <th>Photos</th>
                             <th>Title</th>
                             <th>Landlord</th>
                             <th>Type</th>
@@ -188,12 +190,28 @@ mysqli_close($conn);
                     <tbody>
                         <?php if (mysqli_num_rows($listingsResult) === 0): ?>
                             <tr>
-                                <td colspan="9" class="text-center text-muted py-4">No house listings found in database.</td>
+                                <td colspan="10" class="text-center text-muted py-4">No house listings found in database.</td>
                             </tr>
                         <?php else: ?>
                             <?php while ($row = mysqli_fetch_assoc($listingsResult)): ?>
+                                <?php
+                                    $imgs = !empty($row['all_images']) ? explode('||', $row['all_images']) : [];
+                                    $thumb = !empty($imgs[0]) ? htmlspecialchars($imgs[0]) : '';
+                                ?>
                                 <tr>
                                     <td><?php echo intval($row['house_id']); ?></td>
+                                    <td>
+                                        <?php if ($thumb !== ''): ?>
+                                            <div style="position:relative; width:50px; height:40px;">
+                                                <img src="<?php echo $thumb; ?>" alt="House" style="width:50px; height:40px; object-fit:cover; border-radius:6px;">
+                                                <?php if (count($imgs) > 1): ?>
+                                                    <span class="badge bg-dark" style="position:absolute; bottom:0; right:0; font-size:0.6rem; padding:1px 3px;">+<?php echo count($imgs) - 1; ?></span>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="text-muted"><i class="fas fa-image"></i> 0</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><strong><?php echo htmlspecialchars($row['title']); ?></strong></td>
                                     <td><?php echo htmlspecialchars($row['landlord_name'] ?? 'System/Unknown'); ?></td>
                                     <td><?php echo htmlspecialchars($row['house_type']); ?></td>

@@ -7,7 +7,29 @@ function db_connect() {
         die('Database connection failed: ' . mysqli_connect_error());
     }
     mysqli_set_charset($conn, 'utf8mb4');
+    ensure_schema_up_to_date($conn);
     return $conn;
+}
+
+function ensure_schema_up_to_date($conn) {
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    $res = mysqli_query($conn, "SHOW COLUMNS FROM landlord LIKE 'profile_image'");
+    if ($res && mysqli_num_rows($res) === 0) {
+        @mysqli_query($conn, "ALTER TABLE landlord ADD COLUMN profile_image VARCHAR(255) DEFAULT NULL");
+    }
+
+    $res = mysqli_query($conn, "SHOW COLUMNS FROM landlord LIKE 'citizenship_image'");
+    if ($res && mysqli_num_rows($res) === 0) {
+        @mysqli_query($conn, "ALTER TABLE landlord ADD COLUMN citizenship_image VARCHAR(255) DEFAULT NULL");
+    }
+
+    $res = mysqli_query($conn, "SHOW COLUMNS FROM house_image LIKE 'is_primary'");
+    if ($res && mysqli_num_rows($res) === 0) {
+        @mysqli_query($conn, "ALTER TABLE house_image ADD COLUMN is_primary TINYINT(1) DEFAULT 0");
+    }
 }
 
 function esc($value) {

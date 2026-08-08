@@ -118,43 +118,55 @@ $fav_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM favo
 $req_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM interest_request WHERE tenant_id=$tenant_id"))['c'];
 $review_count = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM review WHERE tenant_id=$tenant_id"))['c'];
 
+function process_house_row($row) {
+    $images = !empty($row['all_images']) ? explode('||', $row['all_images']) : (!empty($row['image_url']) ? [$row['image_url']] : []);
+    $row['images'] = array_values(array_filter($images));
+    if (empty($row['image_url']) && !empty($row['images'][0])) {
+        $row['image_url'] = $row['images'][0];
+    }
+    return $row;
+}
+
 /* ---------------------- BROWSE HOUSES ---------------------- */
 $houses = [];
 if ($tab === 'browse' || $tab === 'overview') {
     $sql = "SELECT h.*,
+                   (SELECT GROUP_CONCAT(image_url ORDER BY image_id ASC SEPARATOR '||') FROM house_image WHERE house_id = h.house_id) AS all_images,
                    (SELECT image_url FROM house_image WHERE house_id = h.house_id LIMIT 1) AS image_url,
                    (SELECT COUNT(*) FROM favorite f WHERE f.house_id = h.house_id AND f.tenant_id = $tenant_id) AS is_fav
             FROM house h
             WHERE h.availability_status = 'available'
             ORDER BY h.created_at DESC";
     $res = mysqli_query($conn, $sql);
-    while ($row = mysqli_fetch_assoc($res)) $houses[] = $row;
+    while ($row = mysqli_fetch_assoc($res)) $houses[] = process_house_row($row);
 }
 
 /* ---------------------- FAVORITES ---------------------- */
 $favorites = [];
 if ($tab === 'favorites') {
     $sql = "SELECT h.*, f.favorite_id,
+                   (SELECT GROUP_CONCAT(image_url ORDER BY image_id ASC SEPARATOR '||') FROM house_image WHERE house_id = h.house_id) AS all_images,
                    (SELECT image_url FROM house_image WHERE house_id = h.house_id LIMIT 1) AS image_url
             FROM favorite f
             JOIN house h ON h.house_id = f.house_id
             WHERE f.tenant_id = $tenant_id
             ORDER BY f.saved_at DESC";
     $res = mysqli_query($conn, $sql);
-    while ($row = mysqli_fetch_assoc($res)) $favorites[] = $row;
+    while ($row = mysqli_fetch_assoc($res)) $favorites[] = process_house_row($row);
 }
 
 /* ---------------------- MY REQUESTS ---------------------- */
 $requests = [];
 if ($tab === 'requests' || $tab === 'overview') {
     $sql = "SELECT r.*, h.title, h.city, h.address,
+                   (SELECT GROUP_CONCAT(image_url ORDER BY image_id ASC SEPARATOR '||') FROM house_image WHERE house_id = h.house_id) AS all_images,
                    (SELECT image_url FROM house_image WHERE house_id = h.house_id LIMIT 1) AS image_url
             FROM interest_request r
             JOIN house h ON h.house_id = r.house_id
             WHERE r.tenant_id = $tenant_id
             ORDER BY r.requested_at DESC";
     $res = mysqli_query($conn, $sql);
-    while ($row = mysqli_fetch_assoc($res)) $requests[] = $row;
+    while ($row = mysqli_fetch_assoc($res)) $requests[] = process_house_row($row);
 }
 
 /* ---------------------- MY REVIEWS + REVIEWABLE HOUSES ---------------------- */
@@ -162,16 +174,18 @@ $my_reviews = [];
 $reviewable = [];
 if ($tab === 'reviews') {
     $sql = "SELECT rv.*, h.title, h.city,
+                   (SELECT GROUP_CONCAT(image_url ORDER BY image_id ASC SEPARATOR '||') FROM house_image WHERE house_id = h.house_id) AS all_images,
                    (SELECT image_url FROM house_image WHERE house_id = h.house_id LIMIT 1) AS image_url
             FROM review rv
             JOIN house h ON h.house_id = rv.house_id
             WHERE rv.tenant_id = $tenant_id
             ORDER BY rv.created_at DESC";
     $res = mysqli_query($conn, $sql);
-    while ($row = mysqli_fetch_assoc($res)) $my_reviews[] = $row;
+    while ($row = mysqli_fetch_assoc($res)) $my_reviews[] = process_house_row($row);
 
     // Houses tenant had an accepted interest in, that they haven't reviewed yet
     $sql = "SELECT DISTINCT h.house_id, h.title, h.city,
+                   (SELECT GROUP_CONCAT(image_url ORDER BY image_id ASC SEPARATOR '||') FROM house_image WHERE house_id = h.house_id) AS all_images,
                    (SELECT image_url FROM house_image WHERE house_id = h.house_id LIMIT 1) AS image_url
             FROM interest_request r
             JOIN house h ON h.house_id = r.house_id
@@ -181,7 +195,7 @@ if ($tab === 'reviews') {
                   SELECT house_id FROM review WHERE tenant_id = $tenant_id
               )";
     $res = mysqli_query($conn, $sql);
-    while ($row = mysqli_fetch_assoc($res)) $reviewable[] = $row;
+    while ($row = mysqli_fetch_assoc($res)) $reviewable[] = process_house_row($row);
 }
 
 function h($str) { return htmlspecialchars($str ?? '', ENT_QUOTES); }
@@ -196,7 +210,7 @@ function img_or_placeholder($url) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tenant Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="tenant_dashboard.css">
 

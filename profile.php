@@ -56,6 +56,12 @@ if (!$landlordRow) {
     }
 }
 
+$emailSupported = false;
+$emailColumnResult = mysqli_query($conn, "SHOW COLUMNS FROM users LIKE 'email'");
+if ($emailColumnResult && mysqli_num_rows($emailColumnResult) > 0) {
+    $emailSupported = true;
+}
+
 function saveUploadedImage(array $file, string $dir, array &$errors): ?string
 {
     if (empty($file['name']) || $file['error'] === UPLOAD_ERR_NO_FILE) {
@@ -99,11 +105,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $citizenshipNo = trim($_POST['citizenship_no'] ?? '');
     $ownershipNo = trim($_POST['land_ownership_certificate_no'] ?? '');
 
-    if ($fullName === '' || $email === '' || $citizenshipId === '') {
-        $errors[] = 'Full name, email, and citizenship ID are required.';
+    if ($fullName === '' || $citizenshipId === '' || ($emailSupported && $email === '')) {
+        $errors[] = 'Full name, citizenship ID, and email are required.';
     }
 
-    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    if ($emailSupported && $email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Please enter a valid email address.';
     }
 
@@ -120,29 +126,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        $emailCheckStmt = mysqli_prepare($conn, 'SELECT id FROM users WHERE (email = ? OR phone_number = ?) AND id != ? LIMIT 1');
-        if ($emailCheckStmt) {
-            mysqli_stmt_bind_param($emailCheckStmt, 'ssi', $email, $phoneNumber, $landlordUserId);
-            mysqli_stmt_execute($emailCheckStmt);
-            $result = mysqli_stmt_get_result($emailCheckStmt);
-            if ($existing = mysqli_fetch_assoc($result)) {
-                $errors[] = 'Email or phone number is already in use by another account.';
+        if ($emailSupported) {
+            $emailCheckStmt = mysqli_prepare($conn, 'SELECT id FROM users WHERE (email = ? OR phone_number = ?) AND id != ? LIMIT 1');
+            if ($emailCheckStmt) {
+                mysqli_stmt_bind_param($emailCheckStmt, 'ssi', $email, $phoneNumber, $landlordUserId);
+                mysqli_stmt_execute($emailCheckStmt);
+                $result = mysqli_stmt_get_result($emailCheckStmt);
+                if ($existing = mysqli_fetch_assoc($result)) {
+                    $errors[] = 'Email or phone number is already in use by another account.';
+                }
+                mysqli_stmt_close($emailCheckStmt);
             }
-            mysqli_stmt_close($emailCheckStmt);
+        } else {
+            $emailCheckStmt = mysqli_prepare($conn, 'SELECT id FROM users WHERE phone_number = ? AND id != ? LIMIT 1');
+            if ($emailCheckStmt) {
+                mysqli_stmt_bind_param($emailCheckStmt, 'si', $phoneNumber, $landlordUserId);
+                mysqli_stmt_execute($emailCheckStmt);
+                $result = mysqli_stmt_get_result($emailCheckStmt);
+                if ($existing = mysqli_fetch_assoc($result)) {
+                    $errors[] = 'Phone number is already in use by another account.';
+                }
+                mysqli_stmt_close($emailCheckStmt);
+            }
         }
     }
 
     if (empty($errors)) {
-        mysqli_begin_transaction($conn);
+        $userUpdateSql = 'UPDATE users SET full_name = ?, phone_number = ?, citizenship_id = ? WHERE id = ?';
+        if ($emailSupported) {
+            $userUpdateSql = 'UPDATE users SET full_name = ?, email = ?, phone_number = ?, citizenship_id = ? WHERE id = ?';
+        }
 
-        $userUpdateStmt = mysqli_prepare(
-            $conn,
-            'UPDATE users SET full_name = ?, email = ?, phone_number = ?, citizenship_id = ? WHERE id = ?'
-        );
+        $userUpdateStmt = mysqli_prepare($conn, $userUpdateSql);
         if (!$userUpdateStmt) {
             $errors[] = 'Unable to update user profile.';
         } else {
-            mysqli_stmt_bind_param($userUpdateStmt, 'ssssi', $fullName, $email, $phoneNumber, $citizenshipId, $landlordUserId);
+            if ($emailSupported) {
+                mysqli_stmt_bind_param($userUpdateStmt, 'ssssi', $fullName, $email, $phoneNumber, $citizenshipId, $landlordUserId);
+            } else {
+                mysqli_stmt_bind_param($userUpdateStmt, 'sssi', $fullName, $phoneNumber, $citizenshipId, $landlordUserId);
+            }
             if (!mysqli_stmt_execute($userUpdateStmt)) {
                 $errors[] = 'Unable to update user information.';
             }
@@ -182,23 +205,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        mysqli_commit($conn);
-        $success = 'Profile updated successfully.';
-        $_SESSION['username'] = $user['username'];
-        $user['full_name'] = $fullName;
-        $user['email'] = $email;
-        $user['phone_number'] = $phoneNumber;
-        $user['citizenship_id'] = $citizenshipId;
-        $landlordRow['citizenship_no'] = $citizenshipNo;
-        $landlordRow['land_ownership_certificate_no'] = $ownershipNo;
-        if ($profileImagePath !== null) {
-            $landlordRow['profile_image'] = $profileImagePath;
-        }
-        if ($citizenshipImagePath !== null) {
-            $landlordRow['citizenship_image'] = $citizenshipImagePath;
-        }
-    } else {
-        mysqli_rollback($conn);
+        mysqli_close($conn);
+        header('Location: landlord_dashboard.php');
+        exit();
     }
 }
 
@@ -241,7 +250,9 @@ mysqli_close($conn);
         <div class="form-grid">
           <div class="fg full"><label>Full Name</label><input type="text" name="full_name" value="<?php echo esc($user['full_name'] ?? ''); ?>" required></div>
           <div class="fg"><label>Username</label><input type="text" value="<?php echo esc($user['username'] ?? ''); ?>" readonly></div>
+          <?php if ($emailSupported): ?>
           <div class="fg"><label>Email</label><input type="email" name="email" value="<?php echo esc($user['email'] ?? ''); ?>" required></div>
+          <?php endif; ?>
           <div class="fg"><label>Phone Number</label><input type="text" name="phone_number" value="<?php echo esc($user['phone_number'] ?? ''); ?>" pattern="[0-9]{10,15}"></div>
           <div class="fg full"><label>Citizenship ID</label><input type="text" name="citizenship_id" value="<?php echo esc($user['citizenship_id'] ?? ''); ?>" required></div>
           <div class="fg full"><label>Citizenship Number</label><input type="text" name="citizenship_no" value="<?php echo esc($landlordRow['citizenship_no'] ?? ''); ?>"></div>

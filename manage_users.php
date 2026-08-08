@@ -5,6 +5,12 @@ require_role('admin');
 
 $conn = db_connect();
 
+$emailSupported = false;
+$emailColumnResult = mysqli_query($conn, "SHOW COLUMNS FROM users LIKE 'email'");
+if ($emailColumnResult && mysqli_num_rows($emailColumnResult) > 0) {
+    $emailSupported = true;
+}
+
 $notice = trim($_GET['notice'] ?? '');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -23,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$users = mysqli_query($conn, "SELECT id, full_name, username, user_type, phone_number, created_at FROM users ORDER BY id ASC");
+$users = mysqli_query($conn, "SELECT id, full_name, username" . ($emailSupported ? ", email" : "") . ", user_type, phone_number, created_at FROM users ORDER BY id ASC");
 $currentUserId = $_SESSION['user_id'] ?? 0;
 
 mysqli_close($conn);
@@ -123,7 +129,6 @@ mysqli_close($conn);
                             <th>ID</th>
                             <th>Full Name</th>
                             <th>Username</th>
-                            <th>Email</th>
                             <th>User Type</th>
                             <th>Phone Number</th>
                             <th>Registration Date</th>
@@ -136,7 +141,6 @@ mysqli_close($conn);
                                 <td><?php echo $counter++; ?></td>
                                 <td><?php echo htmlspecialchars($row['full_name']); ?></td>
                                 <td><?php echo htmlspecialchars($row['username']); ?></td>
-                                <td><?php echo htmlspecialchars($row['email'] ?? ''); ?></td>
                                 <td>
                                     <?php if ($row['user_type'] === 'admin'): ?>
                                         <span class="badge bg-danger">Admin</span>
