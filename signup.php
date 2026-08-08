@@ -68,11 +68,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (mysqli_stmt_execute($stmt)) {
                 $newUserId = mysqli_insert_id($conn);
 
-                if ($user_type === 'landlord') {
+if ($user_type === 'landlord') {
                     $landlordStmt = mysqli_prepare($conn, 'INSERT INTO landlord (user_id, verification_status) VALUES (?, ?)');
                     if ($landlordStmt) {
                         mysqli_stmt_bind_param($landlordStmt, 'is', $newUserId, $verification_status);
                         mysqli_stmt_execute($landlordStmt);
+                    }
+                } else {
+                    $tenantStmt = mysqli_prepare($conn, 'INSERT INTO tenant (user_id) VALUES (?)');
+                    if ($tenantStmt) {
+                        mysqli_stmt_bind_param($tenantStmt, 'i', $newUserId);
+                        mysqli_stmt_execute($tenantStmt);
                     }
                 }
 
