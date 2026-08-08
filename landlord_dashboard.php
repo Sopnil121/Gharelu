@@ -43,6 +43,84 @@ $propertyErrors = [];
 $propertySuccess = '';
 $editingHouse = null;
 $isEditing = false;
+function processSingleUpload(string $fieldName, string $uploadDir, array &$errors): ?string {
+    if (empty($_FILES[$fieldName]['name']) || ($_FILES[$fieldName]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+        return null;
+    }
+
+    if ($_FILES[$fieldName]['error'] !== UPLOAD_ERR_OK) {
+        $errors[] = 'Upload failed for ' . htmlspecialchars($_FILES[$fieldName]['name']) . '.';
+        return null;
+    }
+
+    $tmpName = $_FILES[$fieldName]['tmp_name'];
+    if (!is_uploaded_file($tmpName) || getimagesize($tmpName) === false) {
+        $errors[] = 'The selected file for ' . htmlspecialchars($_FILES[$fieldName]['name']) . ' is not a valid image.';
+        return null;
+    }
+
+    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
+        $errors[] = 'Unable to create upload directory.';
+        return null;
+    }
+
+    $extension = strtolower(pathinfo($_FILES[$fieldName]['name'], PATHINFO_EXTENSION) ?: 'jpg');
+    $extension = preg_replace('/[^a-z0-9]+/', '', $extension) ?: 'jpg';
+    $safeName = time() . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
+    $destination = $uploadDir . '/' . $safeName;
+
+    if (!move_uploaded_file($tmpName, $destination)) {
+        $errors[] = 'Failed to save uploaded file.';
+        return null;
+    }
+
+    return 'uploads/' . $safeName;
+}
+
+function processMultipleUploads(string $fieldName, string $uploadDir, array &$errors): array {
+    $uploadedPaths = [];
+    if (empty($_FILES[$fieldName]['name'])) {
+        return $uploadedPaths;
+    }
+
+    $fileNames = is_array($_FILES[$fieldName]['name']) ? $_FILES[$fieldName]['name'] : [$_FILES[$fieldName]['name']];
+    $tmpNames = is_array($_FILES[$fieldName]['tmp_name']) ? $_FILES[$fieldName]['tmp_name'] : [$_FILES[$fieldName]['tmp_name']];
+    $errorCodes = is_array($_FILES[$fieldName]['error']) ? $_FILES[$fieldName]['error'] : [$_FILES[$fieldName]['error']];
+
+    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
+        $errors[] = 'Unable to create upload directory.';
+        return $uploadedPaths;
+    }
+
+    foreach ($tmpNames as $index => $tmpName) {
+        if (empty($fileNames[$index]) || !is_uploaded_file($tmpName)) {
+            continue;
+        }
+
+        if (($errorCodes[$index] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+            $errors[] = 'Upload failed for ' . htmlspecialchars($fileNames[$index]) . '.';
+            continue;
+        }
+
+        if (getimagesize($tmpName) === false) {
+            $errors[] = 'The selected file ' . htmlspecialchars($fileNames[$index]) . ' is not a valid image.';
+            continue;
+        }
+
+        $extension = strtolower(pathinfo($fileNames[$index], PATHINFO_EXTENSION) ?: 'jpg');
+        $extension = preg_replace('/[^a-z0-9]+/', '', $extension) ?: 'jpg';
+        $safeName = time() . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
+        $destination = $uploadDir . '/' . $safeName;
+
+        if (move_uploaded_file($tmpName, $destination)) {
+            $uploadedPaths[] = 'uploads/' . $safeName;
+        } else {
+            $errors[] = 'Failed to save uploaded file ' . htmlspecialchars($fileNames[$index]) . '.';
+        }
+    }
+
+    return $uploadedPaths;
+}
 
 // Open a database connection for this request
 $conn = db_connect();
@@ -56,12 +134,10 @@ $conn = db_connect();
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'request_action') {
     $requestId = intval($_POST['request_id'] ?? 0);
     $requestAction = trim($_POST['request_action'] ?? '');
-    // Map the button action name to the actual status value stored in DB
     $allowed = ['approve' => 'accepted', 'reject' => 'rejected', 'reset' => 'pending'];
 
     if ($requestId > 0 && isset($allowed[$requestAction])) {
         $status = $allowed[$requestAction];
-        // Update only if the request's house belongs to this landlord
         $stmt = mysqli_prepare($conn, 'UPDATE interest_request ir JOIN house h ON ir.house_id = h.house_id SET ir.request_status = ? WHERE ir.request_id = ? AND h.landlord_id = ?');
         if ($stmt) {
             mysqli_stmt_bind_param($stmt, 'sii', $status, $requestId, $landlordId);
@@ -70,8 +146,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reque
         }
     }
 
-    // Redirect back to the dashboard (Post/Redirect/Get pattern to avoid
-    // duplicate form resubmission on refresh)
     header('Location: landlord_dashboard.php');
     exit();
 }
@@ -79,10 +153,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reque
 // =====================================================================
 // POST HANDLER: create_property
 // Handles submission of the "Add New Property" form, including
-// validation, optional image uploads, and inserting into the DB.
+// validation, primary image and secondary images uploads.
 // =====================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create_property') {
-    // Collect and trim form fields
     $title = trim($_POST['title'] ?? '');
     $address = trim($_POST['address'] ?? '');
     $city = trim($_POST['city'] ?? '');
@@ -93,109 +166,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
     $amenities = trim($_POST['amenities'] ?? '');
     $description = trim($_POST['description'] ?? '');
 
-    // Basic required-field / type validation
     if ($title === '' || $address === '' || $city === '' || $price === '' || !is_numeric($price)) {
         $propertyErrors[] = 'Please provide a valid title, address, city, and rent amount.';
     }
 
     if (empty($propertyErrors)) {
-        // Ensure the uploads directory exists
         $uploadDir = __DIR__ . '/uploads';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-
-        // -------------------------------------------------------------
-        // Handle multiple uploaded images (if any). Each file is
-        // validated as a real image via getimagesize() before being
-        // moved to the uploads folder with a randomized safe filename.
-        // -------------------------------------------------------------
-        $uploadedImages = [];
-        if (!empty($_FILES['images']['name']) && is_array($_FILES['images']['name'])) {
-            foreach ($_FILES['images']['tmp_name'] as $index => $tmpName) {
-                if (empty($_FILES['images']['name'][$index]) || !is_uploaded_file($tmpName)) {
-                    continue; // skip empty/invalid upload slots
-                }
-
-                $originalName = basename($_FILES['images']['name'][$index]);
-                $extension = pathinfo($originalName, PATHINFO_EXTENSION);
-                // Generate a unique, safe filename to avoid collisions/overwrites
-                $safeName = time() . '_' . uniqid('', true) . ($extension !== '' ? '.' . strtolower($extension) : '');
-                $destination = $uploadDir . '/' . $safeName;
-
-                // getimagesize() acts as a lightweight check that the file is really an image
-                if (getimagesize($tmpName) !== false && move_uploaded_file($tmpName, $destination)) {
-                    $uploadedImages[] = 'uploads/' . $safeName;
-                }
+        $primaryImagePath = processSingleUpload('primary_image', $uploadDir, $propertyErrors);
+        $secondaryImagePaths = processMultipleUploads('secondary_images', $uploadDir, $propertyErrors);
+        if (empty($secondaryImagePaths)) {
+            $singleSec = processSingleUpload('secondary_image', $uploadDir, $propertyErrors);
+            if ($singleSec !== null) {
+                $secondaryImagePaths[] = $singleSec;
             }
         }
+    }
 
-        // -------------------------------------------------------------
-        // Insert the new house record, then insert any uploaded images.
-        // Wrapped in a transaction so a failure in image insertion rolls
-        // back the whole operation (house + images stay consistent).
-        // -------------------------------------------------------------
-        mysqli_begin_transaction($conn);
+    if (empty($propertyErrors)) {
         $stmt = mysqli_prepare(
-            $conn,
-            'INSERT INTO house (landlord_id, title, description, house_type, address, city, price, bedrooms, bathrooms, amenities, availability_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)' 
+          $conn,
+          'INSERT INTO house (landlord_id, title, description, house_type, address, city, price, bedrooms, bathrooms, furnishing, availability_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)' 
         );
 
         if ($stmt) {
-            $status = 'available'; // new listings default to "available"
-            mysqli_stmt_bind_param($stmt, 'isssssdiiss', $landlordId, $title, $description, $houseType, $address, $city, $price, $bedrooms, $bathrooms, $amenities, $status);
-            if (mysqli_stmt_execute($stmt)) {
-                $houseId = mysqli_insert_id($conn);
-                $imageInsertError = false;
+          $status = 'available';
+          mysqli_stmt_bind_param($stmt, 'isssssdiiss', $landlordId, $title, $description, $houseType, $address, $city, $price, $bedrooms, $bathrooms, $amenities, $status);
+          if (mysqli_stmt_execute($stmt)) {
+            $houseId = mysqli_insert_id($conn);
 
-                // Insert each uploaded image path, linked to the new house_id
-                if (!empty($uploadedImages)) {
-                    $imageStmt = mysqli_prepare($conn, 'INSERT INTO house_image (house_id, image_url) VALUES (?, ?)');
-                    if ($imageStmt) {
-                        foreach ($uploadedImages as $imagePath) {
-                            mysqli_stmt_bind_param($imageStmt, 'is', $houseId, $imagePath);
-                            if (!mysqli_stmt_execute($imageStmt)) {
-                                $imageInsertError = true;
-                                break; // stop on first failure
-                            }
-                        }
-                        mysqli_stmt_close($imageStmt);
-                    } else {
-                        $imageInsertError = true;
-                    }
+            // Insert primary image (is_primary = 1)
+            if ($primaryImagePath !== null) {
+                $pStmt = mysqli_prepare($conn, 'INSERT INTO house_image (house_id, image_url, is_primary) VALUES (?, ?, 1)');
+                if ($pStmt) {
+                    mysqli_stmt_bind_param($pStmt, 'is', $houseId, $primaryImagePath);
+                    mysqli_stmt_execute($pStmt);
+                    mysqli_stmt_close($pStmt);
                 }
-
-                if ($imageInsertError) {
-                    // Something went wrong saving images -> undo the house insert too
-                    mysqli_rollback($conn);
-                    $propertyErrors[] = 'Unable to save property images. Please try again.';
-                } else {
-                    // Everything succeeded -> commit and redirect (Post/Redirect/Get)
-                    mysqli_commit($conn);
-                    $propertySuccess = 'Property added successfully.';
-                    header('Location: landlord_dashboard.php');
-                    exit();
-                }
-            } else {
-                mysqli_rollback($conn);
-                $propertyErrors[] = 'Unable to save property. Please try again.';
             }
-            mysqli_stmt_close($stmt);
+
+            // Insert secondary images (is_primary = 0)
+            if (!empty($secondaryImagePaths)) {
+                $sStmt = mysqli_prepare($conn, 'INSERT INTO house_image (house_id, image_url, is_primary) VALUES (?, ?, 0)');
+                if ($sStmt) {
+                    foreach ($secondaryImagePaths as $secPath) {
+                        mysqli_stmt_bind_param($sStmt, 'is', $houseId, $secPath);
+                        mysqli_stmt_execute($sStmt);
+                    }
+                    mysqli_stmt_close($sStmt);
+                }
+            }
+
+            $propertySuccess = 'Property added successfully.';
+            header('Location: landlord_dashboard.php');
+            exit();
+          } else {
+            $propertyErrors[] = 'Unable to save property. Please try again.';
+          }
+          mysqli_stmt_close($stmt);
         } else {
-            // mysqli_prepare() failed - likely a schema/SQL problem
-            mysqli_rollback($conn);
-            $propertyErrors[] = 'Property form could not be processed. Please check schema setup.';
+          $propertyErrors[] = 'Property form could not be processed. Please check schema setup.';
         }
     }
 }
 
 // =====================================================================
 // POST HANDLER: update_property
-// Handles editing an existing listing: updates its fields, optionally
-// deletes selected existing images, and optionally adds new images.
+// Handles editing an existing listing: updates fields, handles deletes,
+// and updates primary / secondary images.
 // =====================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_property') {
-    // Collect and trim form fields
     $houseId = intval($_POST['house_id'] ?? 0);
     $title = trim($_POST['title'] ?? '');
     $address = trim($_POST['address'] ?? '');
@@ -208,36 +247,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
     $amenities = trim($_POST['amenities'] ?? '');
     $availabilityStatus = trim($_POST['availability_status'] ?? 'available');
 
-    // Basic required-field / type validation
     if ($houseId <= 0 || $title === '' || $address === '' || $city === '' || $price === '' || !is_numeric($price)) {
         $propertyErrors[] = 'Please provide a valid listing and make sure all required fields are filled.';
     }
 
-    // Whitelist the availability status to only allowed values
     if (!in_array($availabilityStatus, ['available', 'pending', 'rented'], true)) {
         $availabilityStatus = 'available';
     }
 
     if (empty($propertyErrors)) {
-        // Wrap the update + image changes in a transaction for consistency
-        mysqli_begin_transaction($conn);
+        $uploadDir = __DIR__ . '/uploads';
+        $primaryImagePath = processSingleUpload('primary_image', $uploadDir, $propertyErrors);
+        $secondaryImagePaths = processMultipleUploads('secondary_images', $uploadDir, $propertyErrors);
+        if (empty($secondaryImagePaths)) {
+            $singleSec = processSingleUpload('secondary_image', $uploadDir, $propertyErrors);
+            if ($singleSec !== null) {
+                $secondaryImagePaths[] = $singleSec;
+            }
+        }
+    }
+
+    if (empty($propertyErrors)) {
         $updateStmt = mysqli_prepare(
             $conn,
-            'UPDATE house SET title = ?, description = ?, house_type = ?, address = ?, city = ?, price = ?, bedrooms = ?, bathrooms = ?, amenities = ?, availability_status = ? WHERE house_id = ? AND landlord_id = ?'
+            'UPDATE house SET title = ?, description = ?, house_type = ?, address = ?, city = ?, price = ?, bedrooms = ?, bathrooms = ?, furnishing = ?, availability_status = ? WHERE house_id = ? AND landlord_id = ?'
         );
 
         if ($updateStmt) {
-            // Note: landlord_id is included in WHERE to ensure landlords
-            // can only update their own listings
             mysqli_stmt_bind_param($updateStmt, 'sssssdiissii', $title, $description, $houseType, $address, $city, $price, $bedrooms, $bathrooms, $amenities, $availabilityStatus, $houseId, $landlordId);
             if (mysqli_stmt_execute($updateStmt)) {
-                $imageManageError = false;
-
-                // -----------------------------------------------------
-                // Delete any images the landlord checked for removal.
-                // The DELETE query joins back to `house` to double-check
-                // ownership (landlord_id) before deleting.
-                // -----------------------------------------------------
+                // Delete any images the landlord checked for removal
                 if (!empty($_POST['delete_images']) && is_array($_POST['delete_images'])) {
                     $deleteIds = array_filter(array_map('intval', $_POST['delete_images']));
                     if (!empty($deleteIds)) {
@@ -246,90 +285,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
                         $deleteStmt = mysqli_prepare($conn, $deleteSql);
                         if ($deleteStmt) {
                             mysqli_stmt_bind_param($deleteStmt, 'ii', $houseId, $landlordId);
-                            if (!mysqli_stmt_execute($deleteStmt)) {
-                                $imageManageError = true;
-                            }
+                            mysqli_stmt_execute($deleteStmt);
                             mysqli_stmt_close($deleteStmt);
-                        } else {
-                            $imageManageError = true;
                         }
                     }
                 }
 
-                // -----------------------------------------------------
-                // Upload and insert any newly added images (same logic
-                // as in create_property above).
-                // -----------------------------------------------------
-                if (!$imageManageError && !empty($_FILES['images']['name']) && is_array($_FILES['images']['name'])) {
-                    $uploadDir = __DIR__ . '/uploads';
-                    if (!is_dir($uploadDir)) {
-                        mkdir($uploadDir, 0755, true);
+                // If new primary image is uploaded, unmark existing primary image and insert new primary image
+                if ($primaryImagePath !== null) {
+                    $unmarkStmt = mysqli_prepare($conn, 'UPDATE house_image SET is_primary = 0 WHERE house_id = ?');
+                    if ($unmarkStmt) {
+                        mysqli_stmt_bind_param($unmarkStmt, 'i', $houseId);
+                        mysqli_stmt_execute($unmarkStmt);
+                        mysqli_stmt_close($unmarkStmt);
                     }
 
-                    $newImageStmt = mysqli_prepare($conn, 'INSERT INTO house_image (house_id, image_url) VALUES (?, ?)');
-                    if ($newImageStmt) {
-                        foreach ($_FILES['images']['tmp_name'] as $index => $tmpName) {
-                            if (empty($_FILES['images']['name'][$index]) || !is_uploaded_file($tmpName)) {
-                                continue;
-                            }
-                            $originalName = basename($_FILES['images']['name'][$index]);
-                            $extension = pathinfo($originalName, PATHINFO_EXTENSION);
-                            $safeName = time() . '_' . uniqid('', true) . ($extension !== '' ? '.' . strtolower($extension) : '');
-                            $destination = $uploadDir . '/' . $safeName;
-                            if (getimagesize($tmpName) !== false && move_uploaded_file($tmpName, $destination)) {
-                                $imageUrl = 'uploads/' . $safeName;
-                                mysqli_stmt_bind_param($newImageStmt, 'is', $houseId, $imageUrl);
-                                if (!mysqli_stmt_execute($newImageStmt)) {
-                                    $imageManageError = true;
-                                    break;
-                                }
-                            }
+                    $insertPStmt = mysqli_prepare($conn, 'INSERT INTO house_image (house_id, image_url, is_primary) VALUES (?, ?, 1)');
+                    if ($insertPStmt) {
+                        mysqli_stmt_bind_param($insertPStmt, 'is', $houseId, $primaryImagePath);
+                        mysqli_stmt_execute($insertPStmt);
+                        mysqli_stmt_close($insertPStmt);
+                    }
+                }
+
+                // If new secondary images are uploaded, insert them with is_primary = 0
+                if (!empty($secondaryImagePaths)) {
+                    $insertSStmt = mysqli_prepare($conn, 'INSERT INTO house_image (house_id, image_url, is_primary) VALUES (?, ?, 0)');
+                    if ($insertSStmt) {
+                        foreach ($secondaryImagePaths as $secPath) {
+                            mysqli_stmt_bind_param($insertSStmt, 'is', $houseId, $secPath);
+                            mysqli_stmt_execute($insertSStmt);
                         }
-                        mysqli_stmt_close($newImageStmt);
-                    } else {
-                        $imageManageError = true;
+                        mysqli_stmt_close($insertSStmt);
                     }
                 }
 
-                if (!$imageManageError) {
-                    // All good -> commit and redirect (Post/Redirect/Get)
-                    mysqli_commit($conn);
-                    mysqli_stmt_close($updateStmt);
-                    header('Location: landlord_dashboard.php');
-                    exit();
-                }
-
-                // Something failed while managing images -> roll back everything
-                mysqli_rollback($conn);
-                $propertyErrors[] = 'Unable to update property images. Please try again.';
-            } else {
-                mysqli_rollback($conn);
-                $propertyErrors[] = 'Unable to update property. Please try again.';
+                mysqli_stmt_close($updateStmt);
+                header('Location: landlord_dashboard.php');
+                exit();
             }
             mysqli_stmt_close($updateStmt);
-        } else {
-            mysqli_rollback($conn);
-            $propertyErrors[] = 'Property update form could not be processed. Please check schema setup.';
         }
     }
+}
 
-    // Re-populate the edit form with the submitted values (so the user
-    // doesn't lose their input if there was a validation error), and
-    // flag that we're in "editing" mode so the Add/Edit tab is shown.
-    $editingHouse = [
-        'house_id' => $houseId,
-        'title' => $title,
-        'address' => $address,
-        'city' => $city,
-        'house_type' => $houseType,
-        'price' => $price,
-        'bedrooms' => $bedrooms,
-        'bathrooms' => $bathrooms,
-        'description' => $description,
-        'amenities' => $amenities,
-        'availability_status' => $availabilityStatus,
-    ];
-    $isEditing = true;
+// =====================================================================
+// POST HANDLER: delete_property
+// Delete listing and its related records securely.
+// =====================================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_property') {
+    $houseId = intval($_POST['house_id'] ?? 0);
+    if ($houseId > 0) {
+        $imgDelStmt = mysqli_prepare($conn, 'DELETE hi FROM house_image hi JOIN house h ON hi.house_id = h.house_id WHERE hi.house_id = ? AND h.landlord_id = ?');
+        if ($imgDelStmt) {
+            mysqli_stmt_bind_param($imgDelStmt, 'ii', $houseId, $landlordId);
+            mysqli_stmt_execute($imgDelStmt);
+            mysqli_stmt_close($imgDelStmt);
+        }
+        $reqDelStmt = mysqli_prepare($conn, 'DELETE ir FROM interest_request ir JOIN house h ON ir.house_id = h.house_id WHERE ir.house_id = ? AND h.landlord_id = ?');
+        if ($reqDelStmt) {
+            mysqli_stmt_bind_param($reqDelStmt, 'ii', $houseId, $landlordId);
+            mysqli_stmt_execute($reqDelStmt);
+            mysqli_stmt_close($reqDelStmt);
+        }
+        $houseDelStmt = mysqli_prepare($conn, 'DELETE FROM house WHERE house_id = ? AND landlord_id = ?');
+        if ($houseDelStmt) {
+            mysqli_stmt_bind_param($houseDelStmt, 'ii', $houseId, $landlordId);
+            mysqli_stmt_execute($houseDelStmt);
+            mysqli_stmt_close($houseDelStmt);
+        }
+    }
+    header('Location: landlord_dashboard.php');
+    exit();
 }
 
 // =====================================================================
@@ -344,7 +371,7 @@ if (!$isEditing && isset($_GET['edit_house_id'])) {
         // Ownership check: house_id AND landlord_id must match
         $editStmt = mysqli_prepare(
             $conn,
-            'SELECT house_id, title, description, house_type, address, city, price, bedrooms, bathrooms, amenities, availability_status FROM house WHERE house_id = ? AND landlord_id = ? LIMIT 1'
+            'SELECT house_id, title, description, house_type, address, city, price, bedrooms, bathrooms, furnishing AS amenities, availability_status FROM house WHERE house_id = ? AND landlord_id = ? LIMIT 1'
         );
         if ($editStmt) {
             mysqli_stmt_bind_param($editStmt, 'ii', $editHouseId, $landlordId);
@@ -354,7 +381,7 @@ if (!$isEditing && isset($_GET['edit_house_id'])) {
                 $editingHouse = $editHouse;
                 $editingHouse['images'] = [];
                 // Load all images belonging to this house for the edit form
-                $imageLoadStmt = mysqli_prepare($conn, 'SELECT image_id, image_url FROM house_image WHERE house_id = ? ORDER BY image_id ASC');
+                $imageLoadStmt = mysqli_prepare($conn, 'SELECT image_id, image_url, is_primary FROM house_image WHERE house_id = ? ORDER BY is_primary DESC, image_id ASC');
                 if ($imageLoadStmt) {
                     mysqli_stmt_bind_param($imageLoadStmt, 'i', $editHouseId);
                     mysqli_stmt_execute($imageLoadStmt);
@@ -431,18 +458,21 @@ if ($houseStmt) {
     // For each house, look up its first image (used as the card thumbnail).
     // Falls back to a generated "No Image Available" placeholder SVG.
     foreach ($houses as &$house) {
-        $imageStmt = mysqli_prepare($conn, 'SELECT image_id, image_url FROM house_image WHERE house_id = ? ORDER BY image_id ASC LIMIT 1');
+        $house['all_images'] = [];
+        $imageStmt = mysqli_prepare($conn, 'SELECT image_id, image_url FROM house_image WHERE house_id = ? ORDER BY is_primary DESC, image_id ASC');
         if ($imageStmt) {
             mysqli_stmt_bind_param($imageStmt, 'i', $house['house_id']);
             mysqli_stmt_execute($imageStmt);
             $imageResult = mysqli_stmt_get_result($imageStmt);
-            if ($imageRow = mysqli_fetch_assoc($imageResult)) {
-                $house['first_image'] = $imageRow['image_url'] ?? '';
+            while ($imageRow = mysqli_fetch_assoc($imageResult)) {
+                if (!empty($imageRow['image_url'])) {
+                    $house['all_images'][] = $imageRow['image_url'];
+                }
             }
             mysqli_stmt_close($imageStmt);
         }
+        $house['first_image'] = $house['all_images'][0] ?? '';
         if (empty($house['first_image'])) {
-            // Inline data-URI SVG placeholder when no image exists
             $house['first_image'] = 'data:image/svg+xml;charset=UTF-8,' . rawurlencode('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240"><rect width="400" height="240" fill="#f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#9ca3af" font-family="Arial, Helvetica, sans-serif" font-size="20">No Image Available</text></svg>');
         }
     }
@@ -486,7 +516,8 @@ mysqli_close($conn);
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Landlord Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
@@ -600,10 +631,12 @@ mysqli_close($conn);
       <!-- Grid of property cards, one per listing -->
       <div class="listings-grid">
         <?php foreach ($houses as $listing): ?>
-          <?php $badgeClass = 'badge-' . $listing['availability_status']; ?>
-          <?php $statusLabel = $listing['availability_status'] === 'available' ? 'Available' : ($listing['availability_status'] === 'rented' ? 'Rented' : 'Pending'); ?>
+          <?php 
+            $badgeClass = 'badge-' . $listing['availability_status']; 
+            $statusLabel = $listing['availability_status'] === 'available' ? 'Available' : ($listing['availability_status'] === 'rented' ? 'Rented' : 'Pending');
+          ?>
           <div class="prop-card" data-status="<?php echo htmlspecialchars($listing['availability_status']); ?>">
-            <div class="prop-img">
+            <div class="prop-img" style="cursor:default;" title="Property main image">
               <?php if (!empty($listing['first_image'])): ?>
                 <img src="<?php echo htmlspecialchars($listing['first_image']); ?>" alt="<?php echo htmlspecialchars($listing['title']); ?>" style="width:100%;height:100%;object-fit:cover;">
               <?php endif; ?>
@@ -615,8 +648,6 @@ mysqli_close($conn);
               <div class="prop-meta"><span>🛏 <?php echo htmlspecialchars($listing['bedrooms']); ?> Bed</span><span>🚿 <?php echo htmlspecialchars($listing['bathrooms']); ?> Bath</span></div>
               <div class="prop-price">Rs <?php echo number_format($listing['price']); ?> <small>/ month</small></div>
               <div class="prop-footer">
-                <!-- Note: this status dropdown is currently display-only;
-                     changing status is done via the Edit form below -->
                 <select>
                   <option<?php echo $listing['availability_status'] === 'available' ? ' selected' : ''; ?>>🟢 Available</option>
                   <option<?php echo $listing['availability_status'] === 'pending' ? ' selected' : ''; ?>>🟡 Pending</option>
@@ -624,7 +655,11 @@ mysqli_close($conn);
                 </select>
                 <div class="prop-actions">
                   <a class="btn btn-ghost" style="padding:5px 10px" href="landlord_dashboard.php?edit_house_id=<?php echo $listing['house_id']; ?>">✏️ Edit</a>
-                  <button class="btn btn-danger" style="padding:5px 10px">🗑</button>
+                  <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this property listing?');">
+                    <input type="hidden" name="action" value="delete_property">
+                    <input type="hidden" name="house_id" value="<?php echo intval($listing['house_id']); ?>">
+                    <button type="submit" class="btn btn-danger" style="padding:5px 10px;">🗑 Delete</button>
+                  </form>
                 </div>
               </div>
             </div>
@@ -673,19 +708,23 @@ mysqli_close($conn);
             <div class="fg full"><label>Amenities</label><input type="text" name="amenities" placeholder="WiFi, Parking, Water, Generator" value="<?php echo htmlspecialchars($editingHouse['amenities'] ?? ''); ?>"></div>
             <!-- Only shown when editing and the listing already has images:
                  each image can be checked for deletion on save -->
-            <?php if ($isEditing && !empty($editingHouse['images'])): ?>
+                    <?php if ($isEditing && !empty($editingHouse['images'])): ?>
               <div class="fg full"><label>Existing Images</label>
-                <div>
+                <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:6px;">
                   <?php foreach ($editingHouse['images'] as $img): ?>
-                    <div style="display:inline-block; margin-right:10px; margin-bottom:10px; text-align:center;">
-                      <img src="<?php echo htmlspecialchars($img['image_url']); ?>" alt="Image" style="width:100px; height:70px; object-fit:cover; display:block; border:1px solid #ddd; margin-bottom:4px;">
-                      <label style="color:#555;"><input type="checkbox" name="delete_images[]" value="<?php echo intval($img['image_id']); ?>"> Delete</label>
+                    <div style="text-align:center; background:#f8fafc; padding:8px; border:1px solid #e2e8f0; border-radius:8px;">
+                      <img src="<?php echo htmlspecialchars($img['image_url']); ?>" alt="Listing image" style="width:110px; height:75px; object-fit:cover; display:block; border-radius:6px; margin-bottom:6px;">
+                      <span style="font-size:10px; font-weight:700; display:block; margin-bottom:4px; color:<?php echo !empty($img['is_primary']) ? '#2c5f8a' : '#64748b'; ?>;">
+                        <?php echo !empty($img['is_primary']) ? '⭐ PRIMARY' : 'SECONDARY'; ?>
+                      </span>
+                      <label style="font-size:11px; color:#e53e3e; cursor:pointer;"><input type="checkbox" name="delete_images[]" value="<?php echo intval($img['image_id']); ?>"> Delete</label>
                     </div>
                   <?php endforeach; ?>
                 </div>
               </div>
             <?php endif; ?>
-            <div class="fg full"><label>Property Images</label><input type="file" name="images[]" multiple accept="image/*"></div>
+            <div class="fg full"><label>Upload Primary Image (Main Cover Photo)</label><input type="file" name="primary_image" accept="image/*"></div>
+            <div class="fg full"><label>Upload Secondary Images (Additional Photos)</label><input type="file" name="secondary_images[]" multiple accept="image/*"></div>
             <div class="fg full"><label>Description</label><textarea name="description" placeholder="Describe the property..."><?php echo htmlspecialchars($editingHouse['description'] ?? ''); ?></textarea></div>
             <!-- Availability status is only editable on the edit form (new listings default to "available") -->
             <?php if ($isEditing): ?>
