@@ -63,8 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($errors)) {
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
             $verification_status = $user_type === 'tenant' ? 'verified' : 'pending';
-            $stmt = mysqli_prepare($conn, 'INSERT INTO users (full_name, username, phone_number, citizenship_id, user_type, password, verification_status) VALUES (?, ?, ?, ?, ?, ?, ?)');
-            mysqli_stmt_bind_param($stmt, 'sssssss', $full_name, $username, $phone_number, $citizenship_id, $user_type, $hashed_password, $verification_status);
+            $stmt = mysqli_prepare($conn, 'INSERT INTO users (full_name, username, phone_number, citizenship_id, user_type, password) VALUES (?, ?, ?, ?, ?, ?)');
+            mysqli_stmt_bind_param($stmt, 'ssssss', $full_name, $username, $phone_number, $citizenship_id, $user_type, $hashed_password);
             if (mysqli_stmt_execute($stmt)) {
                 $newUserId = mysqli_insert_id($conn);
 
@@ -108,8 +108,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="register-container">
 
         <div class="top-section">
-
-            <div class="icon">🏠</div>
 
             <h1>Join Gharelu</h1>
 

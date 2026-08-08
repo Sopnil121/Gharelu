@@ -372,7 +372,6 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'home';
         <div class="container">
             <div class="nav-brand">
 <a href="index.php?section=home" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:0.5rem;">
-                    <i class="fas fa-home"></i>
                     <span>Gharelu</span>
                 </a>
             </div>
@@ -920,7 +919,6 @@ $section = isset($_GET['section']) ? $_GET['section'] : 'home';
             <div class="footer-grid">
                 <div class="footer-brand">
                     <a href="index.php?section=home" style="text-decoration:none;color:inherit;">
-                        <i class="fas fa-home"></i>
                         <h3>Gharelu</h3>
                     </a>
                     <p>Your premium destination for finding beautiful homes and trustworthy landlords across Nepal. Making renting effortless and reliable.</p>

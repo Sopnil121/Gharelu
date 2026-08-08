@@ -98,7 +98,7 @@
       <div class="listings-grid">
         <!-- Card 1 -->
         <div class="prop-card" data-status="available">
-          <div class="prop-img">🏠<span class="badge badge-available">Available</span></div>
+          <div class="prop-img"><span class="badge badge-available">Available</span></div>
           <div class="prop-body">
             <div class="prop-title">2BHK Flat – Lalitpur</div>
             <div class="prop-loc">📍 Lalitpur, Kathmandu</div>
@@ -134,7 +134,7 @@
 
         <!-- Card 3 -->
         <div class="prop-card" data-status="available">
-          <div class="prop-img">🏡<span class="badge badge-available">Available</span></div>
+          <div class="prop-img"><span class="badge badge-available">Available</span></div>
           <div class="prop-body">
             <div class="prop-title">3BHK House – Bhaktapur</div>
             <div class="prop-loc">📍 Bhaktapur</div>
@@ -170,7 +170,7 @@
           <div class="fg full"><label>Description</label><textarea placeholder="Describe the property..."></textarea></div>
         </div>
         <br>
-        <button class="btn btn-primary">🏠 Publish Listing</button>
+        <button class="btn btn-primary">Publish Listing</button>
       </div>
     </div>
 
@@ -181,7 +181,7 @@
 
         <div class="req-card">
           <div>
-            <div class="req-prop">🏠 2BHK Flat – Lalitpur</div>
+            <div class="req-prop">2BHK Flat – Lalitpur</div>
             <div class="req-name">Sita Thapa</div>
             <div class="req-contact">
               <a href="mailto:sita@email.com">✉️ sita@email.com</a>
@@ -199,7 +199,7 @@
 
         <div class="req-card">
           <div>
-            <div class="req-prop">🏡 3BHK House – Bhaktapur</div>
+            <div class="req-prop">3BHK House – Bhaktapur</div>
             <div class="req-name">Bikash Rai</div>
             <div class="req-contact">
               <a href="mailto:bikash@email.com">✉️ bikash@email.com</a>

@@ -111,7 +111,7 @@ include 'header.php';
     <nav class="navbar">
         <div class="container">
             <div class="nav-brand">
-                <span>🏡 Gharelu</span>
+                <span>Gharelu</span>
             </div>
             <div class="nav-links">
                 <a href="index.php" class="active">Home</a>
@@ -314,7 +314,6 @@ include 'header.php';
         <div class="container">
             <div class="footer-grid">
                 <div class="footer-brand">
-                    <i class="fas fa-home"></i>
                     <h3>Gharelu</h3>
                     <p>Your premium destination for finding beautiful homes and trustworthy landlords. Making renting effortless and reliable.</p>
                 </div>

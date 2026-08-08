@@ -494,7 +494,7 @@ mysqli_close($conn);
 <!-- SIDEBAR: branding, logged-in user info, and tab navigation -->
 <aside class="sidebar">
 
-  <div class="logo"><span>🏠Gharelu</span></div>
+  <div class="logo"><span>Gharelu</span></div>
   <!-- Avatar + name now doubles as the Profile link -->
   <a class="user-info" href="profile.php" title="View Profile">
     <div class="av"><?php echo htmlspecialchars($avatarLetter); ?></div>
@@ -699,7 +699,7 @@ mysqli_close($conn);
             <?php endif; ?>
           </div>
           <br>
-          <button class="btn btn-primary"><?php echo $isEditing ? '💾 Update Listing' : '🏠 Publish Listing'; ?></button>
+          <button class="btn btn-primary"><?php echo $isEditing ? '💾 Update Listing' : 'Publish Listing'; ?></button>
           <?php if ($isEditing): ?>
             <a class="btn btn-ghost" href="landlord_dashboard.php">Cancel</a>
           <?php endif; ?>

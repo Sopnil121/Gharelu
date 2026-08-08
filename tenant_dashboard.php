@@ -209,7 +209,6 @@ function img_or_placeholder($url) {
     <!-- SIDEBAR -->
     <aside class="dash-sidebar">
         <div class="dash-brand">
-            <i class="fas fa-home"></i>
             <span>Gharelu</span>
         </div>
 

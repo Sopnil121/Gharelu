@@ -20,13 +20,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_bind_param($stmt1, 'si', $status, $id);
             mysqli_stmt_execute($stmt1);
         }
-        
-        // Update users table
-        $stmt2 = mysqli_prepare($conn, 'UPDATE users SET verification_status = ?, verified_at = NOW() WHERE id = ?');
-        if ($stmt2) {
-            mysqli_stmt_bind_param($stmt2, 'si', $status, $id);
-            mysqli_stmt_execute($stmt2);
-        }
 
         $notice = $action === 'approve' ? 'Landlord verified successfully.' : 'Landlord rejected successfully.';
         header('Location: admin_dashboard.php?notice=' . urlencode($notice));
@@ -63,7 +56,7 @@ mysqli_close($conn);
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>🏠Gharelu Admin Dashboard</title>
+    <title>Gharelu Admin Dashboard</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -77,7 +70,7 @@ mysqli_close($conn);
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="admin_dashboard.php">
-            🏡 Gharelu
+            Gharelu
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
