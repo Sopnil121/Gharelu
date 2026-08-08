@@ -1184,3 +1184,158 @@ body {
         font-size: 0.8rem;
     }
 }
+/* Alert Messages */
+.alert {
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    animation: slideDown 0.3s ease;
+}
+
+.alert i {
+    font-size: 1.2rem;
+    margin-top: 0.15rem;
+}
+
+.alert-success {
+    background: #f0fff4;
+    border: 1px solid #c6f6d5;
+    color: #22543d;
+}
+
+.alert-success i {
+    color: #38a169;
+}
+
+.alert-error {
+    background: #fff5f5;
+    border: 1px solid #fed7d7;
+    color: #742a2a;
+}
+
+.alert-error i {
+    color: #e53e3e;
+}
+
+.alert-error ul {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.alert-error li {
+    margin-bottom: 0.25rem;
+}
+
+.required {
+    color: #e53e3e;
+    font-weight: 600;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.response-time {
+    background: linear-gradient(135deg, #ebf8ff, #bee3f8) !important;
+}
+
+.response-time i {
+    color: #2b6cb0 !important;
+}
+
+/* Admin Table Styles */
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 2rem 0;
+    background: white;
+    box-shadow: var(--shadow-md);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.admin-table th {
+    background: var(--primary-color);
+    color: white;
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+}
+
+.admin-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-table tr:hover {
+    background: #f7fafc;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-unread {
+    background: #fefcbf;
+    color: #744210;
+}
+
+.status-read {
+    background: #bee3f8;
+    color: #2a4365;
+}
+
+.status-replied {
+    background: #c6f6d5;
+    color: #22543d;
+}
+
+.btn-small {
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 0.8rem;
+    display: inline-block;
+    margin: 0 0.25rem;
+    background: #e2e8f0;
+    color: #2d3748;
+    transition: var(--transition);
+}
+
+.btn-small:hover {
+    background: #cbd5e0;
+}
+
+.btn-small.btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-small.btn-primary:hover {
+    background: var(--primary-dark);
+}
+
+.text-center {
+    text-align: center;
+}
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
