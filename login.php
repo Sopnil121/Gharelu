@@ -1,28 +1,31 @@
 <?php
 
-require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/config.php';
+
+$is_logged_in = !empty($_SESSION['user_id']);
+$session_user_type = $_SESSION['user_type'] ?? '';
 
 if (!empty($_SESSION['user_id']) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     redirect_role_home();
 }
 
 $errors = [];
-$username = '';
+$login_id = '';
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     session_regenerate_id(true);
     $_SESSION = [];
 
-    $username = trim($_POST['username'] ?? '');
+    $login_id = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    if ($username === '' || $password === '') {
-        $errors[] = 'Please enter both username and password.';
+    if ($login_id === '' || $password === '') {
+        $errors[] = 'Please enter both username/email and password.';
     } else {
         $conn = db_connect();
-        $stmt = mysqli_prepare($conn, 'SELECT id, username, password, user_type FROM users WHERE username = ? LIMIT 1');
-        mysqli_stmt_bind_param($stmt, 's', $username);
+        $stmt = mysqli_prepare($conn, 'SELECT id, username, password, user_type FROM users WHERE username = ? OR email = ? LIMIT 1');
+        mysqli_stmt_bind_param($stmt, 'ss', $login_id, $login_id);
         mysqli_stmt_execute($stmt);
         $result = mysqli_stmt_get_result($stmt);
 
@@ -77,18 +80,59 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Login</title>
-
-    <link rel="stylesheet" href="auth.css">
-
+    <title>GHARELU - Login</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/auth.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 
 <body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="index.php">
+                    Gharelu
+                </a>
+            </div>
+            <div class="nav-content">
+                <div class="nav-links">
+                    <a href="index.php">Home</a>
+                    <a href="index.php#properties-section">Listings</a>
+                    <a href="index.php#platform-section">About</a>
+                    <a href="index.php#contact-us-section">Contact</a>
+                    <?php if ($is_logged_in): ?>
+                        <?php if ($session_user_type === 'tenant'): ?>
+                            <a href="tenant/dashboard.php">Dashboard</a>
+                        <?php elseif ($session_user_type === 'landlord'): ?>
+                            <a href="landlord/dashboard.php">Dashboard</a>
+                        <?php elseif ($session_user_type === 'admin'): ?>
+                            <a href="admin/dashboard.php">Dashboard</a>
+                        <?php endif; ?>
+                        <a href="profile.php">Profile</a>
+                    <?php endif; ?>
+                </div>
+                <div class="auth-buttons">
+                    <?php if ($is_logged_in): ?>
+                        <span class="user-greeting" style="font-weight: 500; font-size: 0.9rem; color: var(--text-light); align-self: center; margin-right: 0.5rem;">
+                            Hello, <?php echo htmlspecialchars($_SESSION['username']); ?>
+                        </span>
+                        <a href="logout.php" class="btn-outline"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    <?php else: ?>
+                        <a href="login.php" class="btn-primary">Login</a>
+                        <a href="signup.php" class="btn-primary">Register</a>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="mobile-menu" onclick="toggleMobileMenu()">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </nav>
+
+    <main class="auth-main">
 
     <div class="login-container">
 
@@ -96,7 +140,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             <h1>Welcome Back</h1>
 
-            <p>Login to your Gharelu account</p>
+            <p>Login to your GHARELU account</p>
 
         </div>
 
@@ -115,8 +159,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <form method="POST">
 
                 <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" name="username" value="<?php echo htmlspecialchars($username); ?>" required>
+                    <label>Username or Email</label>
+                    <input type="text" name="username" placeholder="Enter username or email" value="<?php echo htmlspecialchars($login_id); ?>" required>
                 </div>
 
                 <div class="form-group">
@@ -144,6 +188,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         </div>
 
     </div>
+
+    </main>
+
+    <script>
+    function toggleMobileMenu() {
+        const navContent = document.querySelector('.nav-content');
+        if (navContent) {
+            navContent.classList.toggle('open');
+        }
+    }
+    </script>
 
 </body>
 
